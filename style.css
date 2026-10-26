@@ -1,0 +1,214 @@
+/* ===== Стратегия — тёмная игровая тема, поле 8x8 с зонами ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --zone-light: #2b3a4a;
+    --zone-dark: #1c2733;
+    --p1: #2dd4bf;
+    --p2: #f87171;
+    --select: #fbbf24;
+    --move: #34d399;
+}
+
+html, body { height: 100%; }
+
+body {
+    background: radial-gradient(1200px 700px at 50% -10%, #16222e 0%, var(--bg) 60%);
+    color: #e6edf3;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+}
+
+.game-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* ===== Верхний HUD ===== */
+.hud-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+
+.hud-title .logo {
+    font-weight: 800;
+    letter-spacing: 2px;
+    font-size: 18px;
+    color: var(--select);
+}
+
+.hud-title .version {
+    margin-left: 8px;
+    font-size: 12px;
+    color: #8b949e;
+}
+
+.players-hud {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.player-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #0d1117;
+    opacity: 0.55;
+    transition: all .2s ease;
+}
+
+.player-card.active {
+    opacity: 1;
+    transform: scale(1.04);
+}
+
+.player-1.active { border-color: var(--p1); box-shadow: 0 0 12px rgba(45,212,191,.35); }
+.player-2.active { border-color: var(--p2); box-shadow: 0 0 12px rgba(248,113,113,.35); }
+
+.player-indicator {
+    width: 12px; height: 12px; border-radius: 50%;
+}
+.player-1 .player-indicator { background: var(--p1); }
+.player-2 .player-indicator { background: var(--p2); }
+
+.player-meta { display: flex; flex-direction: column; line-height: 1.15; }
+.player-name { font-size: 13px; font-weight: 600; }
+.player-tag { font-size: 11px; color: #8b949e; }
+
+.turn-counter { font-size: 13px; color: #8b949e; }
+.turn-counter b { color: #e6edf3; font-size: 15px; }
+
+.hud-controls { display: flex; gap: 8px; }
+
+.hud-controls button {
+    background: #21262d;
+    color: #e6edf3;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.hud-controls button:hover { background: #30363d; border-color: #8b949e; }
+#btn-end-turn:hover { border-color: var(--select); color: var(--select); }
+
+/* ===== Поле ===== */
+.board-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 16px;
+}
+
+.game-board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 6px;
+    width: min(78vh, 92vw);
+    aspect-ratio: 1 / 1;
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+
+.zone {
+    position: relative;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .2s ease, outline-color .2s ease;
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+}
+
+.zone.light { background: var(--zone-light); }
+.zone.dark  { background: var(--zone-dark); }
+
+.zone .coord {
+    position: absolute;
+    top: 4px; left: 6px;
+    font-size: 10px;
+    color: rgba(230,237,243,.35);
+    pointer-events: none;
+}
+
+.zone:hover {
+    transform: scale(1.05);
+    z-index: 2;
+    outline-color: rgba(230,237,243,.35);
+}
+
+/* Выбранная зона — золотая пульсация */
+.zone.selected {
+    outline-color: var(--select);
+    box-shadow: 0 0 18px rgba(251,191,36,.6), inset 0 0 14px rgba(251,191,36,.25);
+    animation: pulse .9s ease-in-out infinite alternate;
+    z-index: 3;
+}
+
+@keyframes pulse {
+    from { box-shadow: 0 0 10px rgba(251,191,36,.45), inset 0 0 10px rgba(251,191,36,.2); }
+    to   { box-shadow: 0 0 24px rgba(251,191,36,.85), inset 0 0 16px rgba(251,191,36,.35); }
+}
+
+/* Зоны возможного хода — зелёная подсветка */
+.zone.move-target {
+    outline-color: var(--move);
+    box-shadow: 0 0 12px rgba(52,211,153,.45), inset 0 0 10px rgba(52,211,153,.2);
+}
+
+.zone.move-target::after {
+    content: "";
+    position: absolute;
+    inset: 38%;
+    border-radius: 50%;
+    background: rgba(52,211,153,.55);
+}
+
+/* Территории игроков (задел) */
+.zone.owner-1 { outline-color: rgba(45,212,191,.6); }
+.zone.owner-2 { outline-color: rgba(248,113,113,.6); }
+
+/* ===== Нижний HUD ===== */
+.hud-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 18px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.selected-info { color: #c9d1d9; }
+.selected-info .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: #21262d;
+    border: 1px solid var(--border);
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+.hint { color: #6e7681; font-size: 12px; }

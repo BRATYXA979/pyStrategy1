@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Strategy Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-shell">
+        <!-- Верхний HUD -->
+        <header class="hud-top">
+            <div class="hud-title">
+                <span class="logo">⬡ STRATEGY GAME</span>
+                <span class="version" id="app-version">v0.1.0</span>
+            </div>
+            <div class="players-hud">
+                <div class="player-card player-1 active" id="card-p1">
+                    <span class="player-indicator"></span>
+                    <div class="player-meta">
+                        <span class="player-name">Игрок 1</span>
+                        <span class="player-tag">Ходит…</span>
+                    </div>
+                </div>
+                <div class="turn-counter">Ход: <b id="turn-number">1</b></div>
+                <div class="player-card player-2" id="card-p2">
+                    <span class="player-indicator"></span>
+                    <div class="player-meta">
+                        <span class="player-name">Игрок 2</span>
+                        <span class="player-tag">Ожидание</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hud-controls">
+                <button id="btn-end-turn" title="Завершить ход (Пробел)">Конец хода</button>
+                <button id="btn-fullscreen" title="Полный экран (F11)">⛶</button>
+            </div>
+        </header>
+
+        <!-- Игровое поле -->
+        <main class="board-wrap">
+            <div id="game-board" class="game-board"></div>
+        </main>
+
+        <!-- Нижний HUD -->
+        <footer class="hud-bottom">
+            <div class="selected-info" id="selected-info">Выберите зону на поле</div>
+            <div class="hint">ЛКМ — выбрать зону · Esc — снять выбор · F11 — полный экран · Пробел — конец хода</div>
+        </footer>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+app/node_modules/
+dist/
+out/
+*.zip
+*.bundle
+*.log
+.DS_Store

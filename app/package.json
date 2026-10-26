@@ -1,0 +1,45 @@
+{
+  "name": "strategy-game",
+  "productName": "Strategy Game",
+  "version": "0.1.0",
+  "description": "Пошаговая стратегия: игровое поле с зонами для двух игроков (базовая версия)",
+  "main": "src/main/main.js",
+  "author": "StrategyGame Dev",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.strategygame.app",
+    "productName": "Strategy Game",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Game"
+    },
+    "mac": {
+      "target": ["dmg"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
