@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Strategy Game — Карта провинций 10×10 (HOI4-style)</title>
+<style>
+/* ===== Стратегия: карта провинций — кривые неровные границы в стиле HOI4 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #0b1410;
+    --panel: #131f18;
+    --border: #2a3d31;
+    --p1: #4fc3f7;
+    --p2: #ef9a5a;
+    --select: #ffd54f;
+    --move: #8bc34a;
+    --attack: #ff6b5e;
+}
+
+html, body { height: 100%; }
+
+body {
+    background:
+        radial-gradient(1200px 600px at 50% -10%, #16281c 0%, transparent 60%),
+        var(--bg);
+    color: #dbe7dd;
+    font-family: "Segoe UI", Verdana, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 14px;
+    user-select: none;
+}
+
+h1 {
+    font-size: 20px; letter-spacing: 3px; text-transform: uppercase;
+    color: #a8c8a0; margin-bottom: 10px; font-weight: 600;
+}
+h1 span { color: var(--select); }
+
+/* ---------- HUD ---------- */
+.hud { display: flex; gap: 12px; align-items: stretch; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
+
+.player-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 16px; min-width: 170px; font-size: 13px;
+    display: flex; flex-direction: column; gap: 3px; transition: .25s;
+}
+.player-card b { font-size: 14px; letter-spacing: 1px; }
+.player-card.p1 b { color: var(--p1); }
+.player-card.p2 b { color: var(--p2); }
+.player-card.active { box-shadow: 0 0 12px rgba(255,213,79,.35); border-color: var(--select); transform: translateY(-2px); }
+.player-card .tag { font-size: 10px; color: #7d9483; text-transform: uppercase; letter-spacing: 1px; }
+
+.hud-btn {
+    background: linear-gradient(#22392b, #182a1f); color: #cfe6c8;
+    border: 1px solid var(--border); border-radius: 8px; padding: 0 18px;
+    font-size: 13px; cursor: pointer; letter-spacing: 1px; transition: .2s;
+}
+.hud-btn:hover { border-color: var(--select); color: var(--select); }
+.turn-indicator { display:flex; align-items:center; font-size:13px; color:#9fb59a; padding: 0 10px; }
+.turn-indicator b { color: var(--select); margin-left: 6px; }
+
+/* ---------- Карта ---------- */
+.map-frame {
+    background: linear-gradient(160deg, #10201a, #0c1712);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 30px 36px 22px 44px; position: relative;
+    box-shadow: 0 18px 50px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.4);
+}
+.coord { position:absolute; font-size:11px; color:#5f7a66; letter-spacing:1px; }
+.coord.top    { top:10px; left:50%; transform:translateX(-50%); }
+.coord.bottom { bottom:6px; left:50%; transform:translateX(-50%); }
+.coord.left   { left:10px; top:50%; transform:translateY(-50%) rotate(-90deg); }
+.coord.right  { right:4px; top:50%; transform:translateY(-50%) rotate(90deg); }
+
+#mapSvg {
+    width: min(86vw, 760px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    display: block;
+}
+
+/* провинция = кривой SVG-полигон; граница общая с соседом (без щелей) */
+.zone {
+    stroke: #0d1610;
+    stroke-width: 0.03;
+    stroke-linejoin: round;
+    cursor: pointer;
+    transition: filter .15s;
+}
+.zone:hover { filter: brightness(1.3); }
+
+.zone.selected {
+    fill: var(--select) !important;
+    fill-opacity: .5;
+    stroke: var(--select);
+    stroke-width: 0.055;
+    animation: pulseSel 1.1s ease-in-out infinite;
+}
+@keyframes pulseSel {
+    0%,100% { filter: brightness(1.15) drop-shadow(0 0 .06em var(--select)); }
+    50%     { filter: brightness(1.7)  drop-shadow(0 0 .16em var(--select)); }
+}
+
+.zone.move-target {
+    fill: var(--move) !important;
+    stroke: var(--move);
+    stroke-width: 0.045;
+    animation: pulseMove 1.4s ease-in-out infinite;
+}
+@keyframes pulseMove { 0%,100%{fill-opacity:.22;} 50%{fill-opacity:.48;} }
+.zone.attack-target {
+    fill: var(--attack) !important;
+    fill-opacity: .45;
+    stroke: var(--attack);
+}
+
+/* подписи (размеры в единицах карты: viewBox 0..10) */
+.zone-label {
+    font-size: 0.2px;
+    fill: rgba(255,255,255,.6);
+    text-anchor: middle;
+    pointer-events: none;
+}
+.terrain-icon {
+    font-size: 0.32px;
+    text-anchor: middle;
+    pointer-events: none;
+    opacity: .9;
+}
+
+.unit-glyph { font-size: 0.5px; text-anchor: middle; pointer-events: none; }
+.unit-ring { fill: rgba(0,0,0,.4); stroke-width: 0.04; pointer-events: none; }
+.unit-g1 .unit-ring { stroke: var(--p1); filter: drop-shadow(0 0 .06em var(--p1)); }
+.unit-g2 .unit-ring { stroke: var(--p2); filter: drop-shadow(0 0 .06em var(--p2)); }
+.unit-move-dot { fill: var(--move); filter: drop-shadow(0 0 .05em var(--move)); pointer-events: none; }
+
+/* ---------- Панель информации ---------- */
+.info-bar {
+    margin-top: 12px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; justify-content:center;
+    background: var(--panel); border:1px solid var(--border); border-radius:8px;
+    padding: 8px 18px; font-size:13px; min-height: 40px; max-width: 920px;
+}
+.info-bar .k { color:#7d9483; }
+.info-bar .v { color:#e8f2e2; font-weight:600; }
+.legend { display:flex; gap:14px; font-size:11px; color:#8aa38e; margin-top:8px; flex-wrap:wrap; justify-content:center; }
+.legend i { font-style:normal; }
+.legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.hint { margin-top:6px; font-size:11px; color:#5f7a66; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+<h1>⚔ Strategy <span>·</span> Province Map</h1>
+
+<div class="hud">
+    <div class="player-card p1 active" id="cardP1">
+        <b>Игрок 1</b><span class="tag">Azure · голубая фракция</span>
+        <span id="unitsP1">Юниты: 1/24</span>
+    </div>
+    <div class="turn-indicator">Ход №<b id="turnNum">1</b></div>
+    <button class="hud-btn" id="endTurnBtn">Конец хода ⟳</button>
+    <div class="player-card p2" id="cardP2">
+        <b>Игрок 2</b><span class="tag">Ember · оранжевая фракция</span>
+        <span id="unitsP2">Юниты: 0/24</span>
+    </div>
+</div>
+
+<div class="map-frame">
+    <div class="coord top">С · широта 90°N</div>
+    <div class="coord bottom">Ю · 90°S</div>
+    <div class="coord left">Запад · долгота 180°W</div>
+    <div class="coord right">Восток · 180°E</div>
+    <svg id="mapSvg" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<div class="info-bar" id="infoBar">Выберите провинцию на карте.</div>
+
+<div class="legend">
+    <i><span class="sw" style="background:#4a7a50"></span>Равнина</i>
+    <i><span class="sw" style="background:#315c3d"></span>Лес</i>
+    <i><span class="sw" style="background:#8a9358"></span>Холмы</i>
+    <i><span class="sw" style="background:#9b8a5e"></span>Пустошь</i>
+    <i><span class="sw" style="background:#77604d"></span>Горы ⛰</i>
+    <i><span class="sw" style="background:#2e5f8a"></span>Вода ≈</i>
+    <i><span class="sw" style="background:#c9dde8"></span>Полюс ❄</i>
+    <i style="color:var(--move)">▨ возможный ход</i>
+</div>
+<div class="hint">ЛКМ — выбрать провинцию / свой юнит · клик по зелёной — переместить · Esc — снять выделение · Пробел — конец хода</div>
+
+<script>
+/* ==== Карта сгенерирована tools/gen_map.py -> tools/build.py. Не редактировать вручную. ==== */
+const MAP_DATA = @MAPDATA@;
+/* ========================================================================================== */
+
+const COLS = MAP_DATA.cols, ROWS = MAP_DATA.rows;
+
+// Типы местности: название, иконка, цвет, стоимость входа (null = непроходимо)
+const TERRAIN = {
+    plain:    { name:"Равнина", icon:"",  color:"#4a7a50", cost:1 },
+    forest:   { name:"Лес",     icon:"",  color:"#315c3d", cost:2 },
+    hills:    { name:"Холмы",   icon:"",  color:"#8a9358", cost:2 },
+    desert:   { name:"Пустошь", icon:"",  color:"#9b8a5e", cost:1 },
+    mountain: { name:"Горы",    icon:"⛰", color:"#77604d", cost:null },
+    water:    { name:"Вода",    icon:"≈", color:"#2e5f8a", cost:null },
+    ice:      { name:"Полюс",   icon:"❄", color:"#c9dde8", cost:1 },
+};
+
+/** zones[r][c] = { id, row, col, terrain, poly, label, unit, el } */
+const zones = [];
+for (let r = 0; r < ROWS; r++) zones.push(new Array(COLS).fill(null));
+for (const zd of MAP_DATA.zones) {
+    const z = Object.assign({}, zd, { unit: null });
+    zones[z.row][z.col] = z;
+}
+
+/* ================= Юниты ================= */
+const UNIT_TYPES = {
+    scout:  { name:"Разведчик", glyph:"🐎", moves: 3 },
+    knight: { name:"Рыцарь",    glyph:"⚔", moves: 2 },
+};
+function makeUnit(owner, type, zoneRef) {
+    const u = { owner, type, zone: zoneRef, movesLeft: UNIT_TYPES[type].moves };
+    zoneRef.unit = u;
+    return u;
+}
+makeUnit(1, "scout", zones[8][1]); // стартовая провинция B9
+
+/* ================= Рендер SVG карты ================= */
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("mapSvg");
+const layerZones  = document.createElementNS(NS, "g");
+const layerLabels = document.createElementNS(NS, "g");
+const moveDotsLayer = document.createElementNS(NS, "g");
+const layerUnits  = document.createElementNS(NS, "g");
+svg.appendChild(layerZones); svg.appendChild(layerLabels);
+svg.appendChild(moveDotsLayer); svg.appendChild(layerUnits);
+
+for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+        const z = zones[r][c];
+        const t = TERRAIN[z.terrain];
+
+        // каждая провинция — собственный кривой многоугольник (как в HOI4)
+        const poly = document.createElementNS(NS, "polygon");
+        poly.setAttribute("points", z.poly.map(p => p.join(",")).join(" "));
+        poly.setAttribute("class", "zone");
+        poly.style.fill = t.color;
+        poly.addEventListener("click", () => onZoneClick(z));
+        layerZones.appendChild(poly);
+        z.el = poly;
+
+        const lx = z.label[0], ly = z.label[1];
+        if (t.icon) {
+            const ti = document.createElementNS(NS, "text");
+            ti.setAttribute("x", lx); ti.setAttribute("y", ly - 0.04);
+            ti.setAttribute("class", "terrain-icon");
+            ti.textContent = t.icon;
+            layerLabels.appendChild(ti);
+        }
+        const lbl = document.createElementNS(NS, "text");
+        lbl.setAttribute("x", lx); lbl.setAttribute("y", ly + (t.icon ? 0.26 : 0.07));
+        lbl.setAttribute("class", "zone-label");
+        lbl.textContent = z.id;
+        layerLabels.appendChild(lbl);
+    }
+}
+
+function renderUnits() {
+    while (layerUnits.firstChild) layerUnits.removeChild(layerUnits.firstChild);
+    for (const row of zones) for (const z of row) {
+        if (!z.unit) continue;
+        const g = document.createElementNS(NS, "g");
+        g.setAttribute("class", "unit-g" + z.unit.owner);
+        const cx = z.label[0], cy = z.label[1];
+        const ring = document.createElementNS(NS, "circle");
+        ring.setAttribute("cx", cx); ring.setAttribute("cy", cy - 0.06);
+        ring.setAttribute("r", 0.28);
+        ring.setAttribute("class", "unit-ring");
+        const gl = document.createElementNS(NS, "text");
+        gl.setAttribute("x", cx); gl.setAttribute("y", cy + 0.1);
+        gl.setAttribute("class", "unit-glyph");
+        gl.textContent = UNIT_TYPES[z.unit.type].glyph;
+        g.appendChild(ring); g.appendChild(gl);
+        layerUnits.appendChild(g);
+    }
+    document.getElementById("unitsP1").textContent = "Юниты: " + countUnits(1) + "/24";
+    document.getElementById("unitsP2").textContent = "Юниты: " + countUnits(2) + "/24";
+}
+function countUnits(p) { let n = 0; for (const row of zones) for (const z of row) if (z.unit && z.unit.owner === p) n++; return n; }
+
+/* ================= Выбор провинции и подсветка ================= */
+let selected = null;
+let reachable = new Map(); // zone -> стоимость пути (BFS по очкам движения)
+
+function clearHighlights() {
+    svg.querySelectorAll(".selected,.move-target,.attack-target").forEach(e =>
+        e.classList.remove("selected", "move-target", "attack-target"));
+    while (moveDotsLayer.firstChild) moveDotsLayer.removeChild(moveDotsLayer.firstChild);
+    reachable.clear();
+}
+
+// все достижимые провинции за movesLeft очков: горы/вода нельзя, сквозь врага нельзя
+function computeReachable(unit) {
+    const budget = unit.movesLeft;
+    const dist = new Map([[unit.zone, 0]]);
+    const q = [unit.zone];
+    while (q.length) {
+        const cur = q.shift();
+        const d = dist.get(cur);
+        if (d >= budget) continue;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            if (!dr && !dc) continue;
+            const r = cur.row + dr, c = cur.col + dc;
+            if (r < 0 || c < 0 || r >= ROWS || c >= COLS) continue;
+            const nz = zones[r][c];
+            const t = TERRAIN[nz.terrain];
+            if (t.cost === null) continue;
+            if (nz.unit && nz.unit.owner !== unit.owner) continue;
+            const nd = d + Math.max(1, t.cost);
+            if (nd <= budget && (!dist.has(nz) || nd < dist.get(nz))) {
+                dist.set(nz, nd); q.push(nz);
+            }
+        }
+    }
+    dist.delete(unit.zone);
+    return dist;
+}
+
+function onZoneClick(z) {
+    // приказ двигаться — клик по подсвеченной провинции
+    if (selected && selected.unit && selected.unit.owner === currentPlayer && reachable.has(z)) {
+        const unit = selected.unit;      // юнит-источник (после перемещения selected сменится)
+        const cost = reachable.get(z);
+        moveUnit(unit, z);
+        unit.movesLeft -= cost;
+        clearHighlights();
+        selected = z; z.el.classList.add("selected");
+        if (unit.movesLeft > 0) {
+            reachable = computeReachable(unit);
+            paintReachable();
+        }
+        updateInfo(z);
+        return;
+    }
+    clearHighlights();
+    if (selected === z) { selected = null; updateInfo(null); return; }
+    selected = z;
+    z.el.classList.add("selected");
+    if (z.unit && z.unit.owner === currentPlayer) {
+        reachable = computeReachable(z.unit);
+        paintReachable();
+    }
+    updateInfo(z);
+}
+function paintReachable() {
+    for (const rz of reachable.keys()) {
+        rz.el.classList.add("move-target");
+        const dot = document.createElementNS(NS, "circle");
+        dot.setAttribute("cx", rz.label[0]); dot.setAttribute("cy", rz.label[1] + 0.3);
+        dot.setAttribute("r", 0.06);
+        dot.setAttribute("class", "unit-move-dot");
+        moveDotsLayer.appendChild(dot);
+    }
+}
+
+function moveUnit(unit, dest) {
+    unit.zone.unit = null;
+    dest.unit = unit;
+    unit.zone = dest;
+    renderUnits();
+}
+
+/* ================= Панель информации ================= */
+function updateInfo(z) {
+    const bar = document.getElementById("infoBar");
+    if (!z) { bar.textContent = "Выберите провинцию на карте."; return; }
+    const t = TERRAIN[z.terrain];
+    let html = `<span class="k">Провинция:</span><span class="v">${z.id}</span>` +
+        `<span class="k">Местность:</span><span class="v">${t.icon} ${t.name}</span>` +
+        `<span class="k">Стоимость входа:</span><span class="v">${t.cost === null ? "непроходимо" : t.cost}</span>`;
+    html += z.unit
+        ? `<span class="k">Юнит:</span><span class="v">${UNIT_TYPES[z.unit.type].glyph} ${UNIT_TYPES[z.unit.type].name} · Игрок ${z.unit.owner} (движение: ${z.unit.movesLeft})</span>`
+        : `<span class="k">Юнит:</span><span class="v">—</span>`;
+    bar.innerHTML = html;
+}
+
+/* ================= Ходы игроков ================= */
+let currentPlayer = 1, turn = 1;
+document.getElementById("endTurnBtn").addEventListener("click", endTurn);
+document.addEventListener("keydown", e => {
+    if (e.code === "Space") { e.preventDefault(); endTurn(); }
+    if (e.key === "Escape") { clearHighlights(); selected = null; updateInfo(null); }
+});
+function endTurn() {
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    if (currentPlayer === 1) turn++;
+    for (const row of zones) for (const z of row) if (z.unit) z.unit.movesLeft = UNIT_TYPES[z.unit.type].moves;
+    document.getElementById("turnNum").textContent = turn;
+    document.getElementById("cardP1").classList.toggle("active", currentPlayer === 1);
+    document.getElementById("cardP2").classList.toggle("active", currentPlayer === 2);
+    clearHighlights(); selected = null;
+    updateInfo(null);
+}
+
+renderUnits();
+updateInfo(zones[8][1]);
+</script>
+</body>
+</html>
